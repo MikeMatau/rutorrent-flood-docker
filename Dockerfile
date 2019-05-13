@@ -1,4 +1,4 @@
-FROM lsiobase/alpine:3.7
+FROM lsiobase/alpine:3.8
 
 MAINTAINER romancin
 
@@ -9,24 +9,26 @@ ARG BUILD_CORES
 LABEL build_version="Romancin version:- ${VERSION} Build-date:- ${BUILD_DATE}"
 
 # package version
-ARG MEDIAINF_VER="17.12"
-ARG RTORRENT_VER="0.9.6"
-ARG LIBTORRENT_VER="0.13.6"
-ARG CURL_VER="7.57.0"
-ARG FLOOD_VER="1.0.0"
+ARG MEDIAINF_VER="19.04"
+ARG RTORRENT_VER="v0.9.7"
+ARG LIBTORRENT_VER="v0.13.7"
+ARG CURL_VER="7.64.1"
+ARG GEOIP_VER="1.1.1"
 
 # set env
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/usr/local/lib
-ENV FLOOD_SECRET=password
 ENV CONTEXT_PATH=/
-    
+ENV CREATE_SUBDIR_BY_TRACKERS="no"
+
 RUN NB_CORES=${BUILD_CORES-`getconf _NPROCESSORS_CONF`} && \
  apk add --no-cache \
+	bash-completion \
         ca-certificates \
         fcgi \
         ffmpeg \
         geoip \
+	geoip-dev \
         gzip \
         logrotate \
         nginx \
@@ -55,8 +57,14 @@ RUN NB_CORES=${BUILD_CORES-`getconf _NPROCESSORS_CONF`} && \
         php7-json  \
         php7-mbstring \
         php7-sockets \
-        php7-pear && \
-
+        php7-pear \
+	php7-opcache \
+        php7-apcu \
+        php7-ctype \
+        php7-dev \
+        php7-phar \
+        python \
+        python3 && \
 # install build packages
  apk add --no-cache --virtual=build-dependencies \
         autoconf \
@@ -76,7 +84,6 @@ RUN NB_CORES=${BUILD_CORES-`getconf _NPROCESSORS_CONF`} && \
         linux-headers \
         curl-dev \
         libressl-dev && \
-
 # compile curl to fix ssl for rtorrent
 cd /tmp && \
 mkdir curl && \
@@ -84,7 +91,6 @@ cd curl && \
 wget -qO- https://curl.haxx.se/download/curl-${CURL_VER}.tar.gz | tar xz --strip 1 && \
 ./configure --with-ssl && make -j ${NB_CORES} && make install && \
 ldconfig /usr/bin && ldconfig /usr/lib && \
-
 # install webui
  mkdir -p \
         /usr/share/webapps/rutorrent \
@@ -95,7 +101,7 @@ ldconfig /usr/bin && ldconfig /usr/lib && \
         /defaults/rutorrent-conf/ && \
  rm -rf \
         /defaults/rutorrent-conf/users && \
-
+  pip3 install CfScrape && \
 # install webui extras
 # QuickBox Theme
 git clone https://github.com/QuickBox/club-QuickBox /usr/share/webapps/rutorrent/plugins/theme/themes/club-QuickBox && \
@@ -120,47 +126,49 @@ make install && \
 cd .. && \
 rm -rf plowshare* && \
 apk add --no-cache unzip bzip2 && \
-cd /tmp && \
-wget http://www.rarlab.com/rar/rarlinux-x64-5.4.0.tar.gz && \
-tar zxvf rarlinux-x64-5.4.0.tar.gz && \
-mv rar/rar /usr/bin && \
-mv rar/unrar /usr/bin && \
-rm -rf rar;rm rarlinux-* && \
 cd /usr/share/webapps/rutorrent/plugins/ && \
 git clone https://github.com/Gyran/rutorrent-pausewebui pausewebui && \
 git clone https://github.com/Gyran/rutorrent-ratiocolor ratiocolor && \
 sed -i 's/changeWhat = "cell-background";/changeWhat = "font";/g' /usr/share/webapps/rutorrent/plugins/ratiocolor/init.js && \
 git clone https://github.com/Gyran/rutorrent-instantsearch instantsearch && \
-git clone https://github.com/astupidmoose/rutorrent-logoff logoff && \
 git clone https://github.com/xombiemp/rutorrentMobile && \
 git clone https://github.com/dioltas/AddZip && \
-
+git clone https://github.com/Micdu70/geoip2-rutorrent geoip2 && \
+rm -rf geoip && \
+mkdir -p /usr/share/GeoIP && \
+cd /usr/share/GeoIP && \
+wget https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz && \
+wget https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz && \
+tar xzf GeoLite2-City.tar.gz && \
+tar xzf GeoLite2-Country.tar.gz && \
+rm -f *.tar.gz && \
+mv GeoLite2-*/*.mmdb . && \
+cp *.mmdb /usr/share/webapps/rutorrent/plugins/geoip2/database/ && \
+pecl install geoip-${GEOIP_VER} && \
+chmod +x /usr/lib/php7/modules/geoip.so && \
+echo ";extension=geoip.so" >> /etc/php7/php.ini && \
 # install autodl-irssi perl modules
  perl -MCPAN -e 'my $c = "CPAN::HandleConfig"; $c->load(doit => 1, autoconfig => 1); $c->edit(prerequisites_policy => "follow"); $c->edit(build_requires_install_policy => "yes"); $c->commit' && \
  curl -L http://cpanmin.us | perl - App::cpanminus && \
         cpanm HTML::Entities XML::LibXML JSON JSON::XS && \
-
 # compile xmlrpc-c
 cd /tmp && \
 svn checkout http://svn.code.sf.net/p/xmlrpc-c/code/stable xmlrpc-c && \
 cd /tmp/xmlrpc-c && \
 ./configure --with-libwww-ssl --disable-wininet-client --disable-curl-client --disable-libwww-client --disable-abyss-server --disable-cgi-server && make -j ${NB_CORES} && make install && \
-
 # compile libtorrent
-apk add -X http://dl-cdn.alpinelinux.org/alpine/v3.6/main -U cppunit-dev==1.13.2-r1 cppunit==1.13.2-r1 && \
+# apk add -X http://dl-cdn.alpinelinux.org/alpine/v3.6/main -U cppunit-dev==1.13.2-r1 cppunit==1.13.2-r1 && \
 cd /tmp && \
 mkdir libtorrent && \
 cd libtorrent && \
 wget -qO- https://github.com/rakshasa/libtorrent/archive/${LIBTORRENT_VER}.tar.gz | tar xz --strip 1 && \
 ./autogen.sh && ./configure && make -j ${NB_CORES} && make install && \
-
 # compile rtorrent
 cd /tmp && \
 mkdir rtorrent && \
 cd rtorrent && \
 wget -qO- https://github.com/rakshasa/rtorrent/archive/${RTORRENT_VER}.tar.gz | tar xz --strip 1 && \
 ./autogen.sh && ./configure --with-xmlrpc-c && make -j ${NB_CORES} && make install && \
-
 # compile mediainfo packages
  curl -o \
  /tmp/libmediainfo.tar.gz -L \
@@ -175,7 +183,6 @@ wget -qO- https://github.com/rakshasa/rtorrent/archive/${RTORRENT_VER}.tar.gz | 
         /tmp/libmediainfo --strip-components=1 && \
  tar xf /tmp/mediainfo.tar.gz -C \
         /tmp/mediainfo --strip-components=1 && \
-
  cd /tmp/libmediainfo && \
         ./SO_Compile.sh && \
  cd /tmp/libmediainfo/ZenLib/Project/GNU/Library && \
@@ -207,9 +214,28 @@ wget -qO- https://github.com/rakshasa/rtorrent/archive/${RTORRENT_VER}.tar.gz | 
 # cleanup
  apk del --purge \
         build-dependencies && \
- apk del -X http://dl-cdn.alpinelinux.org/alpine/v3.6/main cppunit-dev && \
+# apk del -X http://dl-cdn.alpinelinux.org/alpine/v3.6/main cppunit-dev && \
  rm -rf \
         /tmp/*
+
+# install flood webui
+RUN  apk add --no-cache \
+       python \
+       nodejs \
+       nodejs-npm && \
+     apk add --no-cache --virtual=build-dependencies \
+       build-base && \
+     mkdir /usr/flood && \
+     cd /usr/flood && \
+     git clone https://github.com/jfurrow/flood . && \
+     cp config.template.js config.js && \
+     npm install && \
+     npm cache clean --force && \
+     npm run build && \
+     npm prune --production && \
+     rm config.js && \
+     apk del --purge build-dependencies && \
+     ln -s /usr/local/bin/mediainfo /usr/bin/mediainfo
 
 # add local files
 COPY root/ /

@@ -1,20 +1,31 @@
 #!/usr/bin/with-contenv bash
 
-# make folders (Original)
-# mkdir -p \
-	/config{/log/nginx,/log/rtorrent,/log/rutorrent,/nginx,/nginx/conf.d,/php,/rtorrent/rtorrent_sess,/rutorrent/settings/users} \
+# Sanitize variables
+SANED_VARS=( CREATE_SUBDIR_BY_TRACKERS )
+for i in "${SANED_VARS[@]}"
+do
+  export echo "$i"="${!i//\"/}"
+  export echo "$i"="$(echo "${!i}" | tr '[:upper:]' '[:lower:]')"
+done
+
+if [ "$CREATE_SUBDIR_BY_TRACKERS" == "yes" ]
+then
+  # make folders
+  mkdir -p \
+	/config{/log/nginx,/log/rtorrent,/log/rutorrent,/nginx,/nginx/conf.d,/php,/rtorrent/rtorrent_sess,/rutorrent/settings/users,/.irssi,/flood,/flood-db} \
 	/config/rutorrent/profiles{/settings,/torrents,/users,/tmp} \
-	/downloads{/completed,/incoming,/watched} \
+	/downloads/{bajaunapeli,bitspyder,torrentfactory,hachede,hdcity,learnflakes,puntotorrent,tbplus,waffles,xbytes,otros,pedros,cinemaggedon,torrentland,tunetraxx,brokenstones,32pages,lztr,p2pelite,bitgamer,psytorrents,pleasuredome,hdspain,iptorrents,trancetraffic,morethantv,passthepopcorn,gp32spain,gazellegames,opencd,mteam,retrowithin,divteam,racingforme,bibliotik,beyondhd,myanonamouse,ultimategamer,x264,awesomehd,broadcasthenet,bitme,theplace,theshow,thegeeks,thevault,theempire,theoccult,torrentleech,hdbits,zonaq,torrentech,sceneaccess,efectodoppler,musicvids,apollo,passtheheadphones,notwhatcd} \
+	/downloads/watch/{bajaunapeli,bitspyder,torrentfactory,hachede,hdcity,learnflakes,puntotorrent,tbplus,waffles,xbytes,otros,pedros,cinemaggedon,torrentland,tunetraxx,brokenstones,32pages,lztr,p2pelite,bitgamer,psytorrents,pleasuredome,hdspain,iptorrents,trancetraffic,morethantv,passthepopcorn,gp32spain,gazellegames,opencd,mteam,retrowithin,divteam,racingforme,bibliotik,beyondhd,myanonamouse,ultimategamer,x264,awesomehd,broadcasthenet,bitme,theplace,theshow,thegeeks,thevault,theempire,theoccult,torrentleech,hdbits,zonaq,torrentech,sceneaccess,efectodoppler,musicvids,apollo,passtheheadphones,notwhatcd} \
 	/run{/nginx,/php} \
 	/var/lib/nginx/tmp/client_body
-
-# make folders
-mkdir -p \
-	/config{/log/nginx,/log/rtorrent,/log/rutorrent,/nginx,/nginx/conf.d,/php,/rtorrent/rtorrent_sess,/rutorrent/settings/users,/.irssi,/flood} \
+else
+  # make folders (Original)
+  mkdir -p \
+	/config{/log/nginx,/log/rtorrent,/log/rutorrent,/nginx,/nginx/conf.d,/php,/rtorrent/rtorrent_sess,/rutorrent/settings/users,.irssi,/flood,/flood-db} \
 	/config/rutorrent/profiles{/settings,/torrents,/users,/tmp} \
 	/run{/nginx,/php} \
 	/var/lib/nginx/tmp/client_body
-
+fi
 
 # copy config
 PREV_DIR=$(pwd)
@@ -33,7 +44,7 @@ cd "${PREV_DIR}" || exit
 
 [[ ! -e /config/nginx/.htpasswd ]] && \
 	cp /defaults/.htpasswd /config/nginx/.htpasswd
-	
+
 [[ ! -e /config/rtorrent/rtorrent.rc ]] && \
 	cp /defaults/rtorrent.rc /config/rtorrent/rtorrent.rc
 cp -pr /config/rutorrent/settings/* /usr/share/webapps/rutorrent/conf/
@@ -54,8 +65,10 @@ cp /config/php/php.ini /etc/php7/php.ini
 [[ -e /config/rtorrent/rtorrent_sess/rtorrent.lock ]] && \
 	rm /config/rtorrent/rtorrent_sess/rtorrent.lock
 
-# permissions
-chown abc:abc \
+if [ "$CREATE_SUBDIR_BY_TRACKERS" == "yes" ]
+then
+  # permissions
+  chown abc:abc \
 	/downloads \
 
 
